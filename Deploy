@@ -1,0 +1,43 @@
+  name: test build deploy
+
+  on:
+    push:
+      branches:
+        - main
+
+    pull_request:
+      branches:
+        - main
+
+  jobs:
+    test:
+      runs-on: ubuntu-latest
+      steps:
+        - name: checkout
+          ...
+          
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - name: checkout
+          ...
+    
+    deploy:
+      needs: [build]
+      runs-on: ubuntu-latest
+      steps:
+        - name: checkout
+          uses: actions/checkout@v4
+        - name: Update deployment.yaml
+          uses: fjogeleit/yaml-update-action@v0.14.0
+          with:
+            valueFile: 'deploy/deployment.yaml'
+            propertyPath: 'spec.template.spec.containers[0].image'
+            value: ghcr.io/${{ github.event.repository.owner.login }}/${{ github.event.repository.name }}:${{ github.sha }}
+            commitChange: ${{ github.event_name != 'pull_request' }}
+            targetBranch: main
+            masterBranchName: main # needed when default branch is not master
+            createPR: ${{ github.event_name != 'pull_request' }}
+            branch: 'deploy'
+            token: ${{ secrets.GITHUB_TOKEN }}
+            message: 'Update Image Version to: ${{ github.sha }}'

@@ -1,0 +1,71 @@
+name: release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/reusable-**"
+    tags:
+      - '*'
+
+  pull_request:
+    paths:
+      - ".github/workflows/reusable-**"
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+      - unlabeled
+    branches:
+      - main
+
+jobs:
+  workflows-to-release:
+    runs-on: ubuntu-latest
+    outputs:
+      names: ${{ steps.changed-workflows.outputs.values }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v46
+
+      - name: Get changed workflows ounder /workflows
+        id: changed-workflows
+        run: |
+          changed_workflows=$(echo "${{ steps.changed-files.outputs.all_modified_files }}" \
+          | tr " " "\n" |  sed '/^\.github\/workflows\/reusable-/!d' \
+          | sed 's/^\.github\/workflows\/reusable-//g;s/\.yaml//g' \
+          | sort -u | tr "\n" "," | sed 's/.$//')
+          
+          # Extract action directory names without considering individual files
+          changed_actions=$(echo "${{ steps.changed-files.outputs.all_modified_files }}" \
+          | tr " " "\n" |  sed '/^\.github\/actions\//!d' \
+          | sed 's/^\.github\/actions\///g' | awk -F'/' '{print $1}' \
+          | sort -u | tr "\n" "," | sed 's/.$//')
+          
+          changed=''
+          if [ ! -z "$changed_workflows" ] && [ ! -z "$changed_actions" ]
+          then
+            changed="${changed_workflows}, ${changed_actions}"
+          elif [ ! -z "$changed_workflows" ]
+          then
+            changed="${changed_workflows}"
+          elif [ ! -z "$changed_actions"  ]
+          then
+            changed="${changed_actions}"
+          fi
+          echo "Changed Workflows: $changed"
+          echo "values=${changed}" >> $GITHUB_OUTPUT
+          
+          # Trim any leading/trailing spaces or newlines from the final result
+          trimmed_changed=$(echo "$changed" | jq -c .)
+
+          echo "Changed Workflows: $trimmed_changed"
+          echo "values=$trimmed_changed" >> $GITHUB_OUTPUT
